@@ -23,16 +23,16 @@ pub fn read_tokens(filemap: Rc<FileMap>) -> Vec<Token> {
 
 #[derive(Clone)]
 pub struct Span {
-    lower_bound: usize, // inclusive
-    upper_bound: usize, // inclusive
+    pub lower_bound: usize, // inclusive
+    pub upper_bound: usize, // inclusive
     filemap: Rc<FileMap>
 }
 
 
 #[derive(Clone)]
 pub struct Token {
-    compiler_token: CompilerToken,
-    span: Span
+    pub compiler_token: CompilerToken,
+    pub span: Span
 }
 
 
