@@ -6,6 +6,7 @@ use syntax::parse::token::Token as CompilerToken;
 use syntax::parse::lexer::{Reader, StringReader, TokenAndSpan};
 
 
+#[allow(dead_code)]
 pub fn read_tokens(filemap: Rc<FileMap>) -> Vec<Token> {
     let sess = ParseSess::new();
     let mut lexer = StringReader::new(&sess.span_diagnostic, filemap.clone());

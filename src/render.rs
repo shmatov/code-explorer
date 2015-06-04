@@ -16,6 +16,7 @@ struct Wrapper {
 }
 
 
+#[allow(dead_code)]
 fn render(tokens: Vec<Token>, mut wrappers: Vec<Wrapper>) -> String {
     wrappers.sort_by(|a, b| {
         // left and longest go first
