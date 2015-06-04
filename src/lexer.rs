@@ -24,7 +24,7 @@ pub fn read_tokens(filemap: Rc<FileMap>) -> Vec<Token> {
 #[derive(Clone)]
 pub struct Span {
     lower_bound: usize, // inclusive
-    upper_bound: usize, // exclusive
+    upper_bound: usize, // inclusive
     filemap: Rc<FileMap>
 }
 
@@ -44,7 +44,7 @@ pub trait GetSnippet {
 impl GetSnippet for Span {
     fn snippet(&self) -> Option<String> {
         self.filemap.src.clone()
-            .map(|src| src[self.lower_bound..self.upper_bound].to_string())
+            .map(|src| src[self.lower_bound .. self.upper_bound + 1].to_string())
     }
 }
 
@@ -61,7 +61,7 @@ fn to_internal_token(token_and_span: TokenAndSpan, filemap: Rc<FileMap>) -> Toke
         compiler_token: token_and_span.tok,
         span: Span {
             lower_bound: token_and_span.sp.lo.to_usize(),
-            upper_bound: token_and_span.sp.hi.to_usize(),
+            upper_bound: token_and_span.sp.hi.to_usize() - 1,
             filemap: filemap
         }
     }
@@ -83,7 +83,7 @@ mod tests {
 
         for token in tokens.iter() {
             println!(
-                "[{}, {}) -> {:?} -> {:?}",
+                "[{}, {}] -> {:?} -> {:?}",
                 token.span.lower_bound, token.span.upper_bound,
                 token.compiler_token, token.snippet()
             );
