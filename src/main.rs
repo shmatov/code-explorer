@@ -4,6 +4,7 @@
 extern crate syntax;
 
 
+mod custom_collections;
 mod lexer;
 
 
