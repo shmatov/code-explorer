@@ -1,3 +1,4 @@
+use std::iter::FromIterator;
 use lexer::{Token, GetSnippet};
 use custom_collections::{Stack, Queue};
 
@@ -11,8 +12,8 @@ struct Chunk {
 
 #[derive(Debug)]
 struct Wrapper {
-    before: Chunk,
-    after: Chunk
+    prefix: Chunk,
+    postfix: Chunk
 }
 
 
@@ -20,35 +21,29 @@ struct Wrapper {
 fn render(tokens: Vec<Token>, mut wrappers: Vec<Wrapper>) -> String {
     wrappers.sort_by(|a, b| {
         // left and longest go first
-        (a.before.position, -(a.after.position as isize)).cmp(&(b.before.position, -(b.after.position as isize)))
+        (a.prefix.position, b.postfix.position)
+            .cmp(&(b.prefix.position, a.postfix.position))
     });
 
-    let mut queue = Queue::new();
-    for wrapper in wrappers {
-        queue.enqueue(wrapper);
-    }
+    let mut wrappers = Queue::from_iter(wrappers);
+    let mut postfixes = Stack::new();
 
-    let mut stack = Stack::new();
-
-    let mut buf = String::new();
+    let mut buffer = String::new();
     for token in tokens {
-        // try prepend
-        while queue.peek().map_or(false, |x| x.before.position == token.span.lower_bound) {
-            let wrapper = queue.dequeue().expect("queue.pop()");
-            buf.push_str(&wrapper.before.text);
-            stack.push(wrapper);
+        while wrappers.peek().map_or(false, |x| x.prefix.position == token.span.lower_bound) {
+            let wrapper = wrappers.dequeue().expect("wrappers.dequeue()");
+            buffer.push_str(&wrapper.prefix.text);
+            postfixes.push(wrapper.postfix);
         }
 
-        // append token
-        buf.push_str(&token.snippet().expect("token.snippet().pop()"));
+        buffer.push_str(&token.snippet().expect("token.snippet()"));
 
-        // try append
-        while stack.peek().map_or(false, |x| x.after.position == token.span.upper_bound) {
-            let wrapper = stack.pop().expect("stack.pop()");
-            buf.push_str(&wrapper.after.text);
+        while postfixes.peek().map_or(false, |x| x.position == token.span.upper_bound) {
+            let postfix = postfixes.pop().expect("postfixes.pop()");
+            buffer.push_str(&postfix.text);
         }
     }
-    buf
+    buffer
 }
 
 
@@ -68,16 +63,16 @@ mod tests {
 
         let wrappers = vec![
             Wrapper {
-                before: Chunk { position: 0, text: "<:0:>".into() },
-                after: Chunk { position: 1, text: "</:0:>".into() }
+                prefix: Chunk { position: 0, text: "<:0:>".into() },
+                postfix: Chunk { position: 1, text: "</:0:>".into() }
             },
             Wrapper {
-                before: Chunk { position: 0, text: "<:1:>".into() },
-                after: Chunk { position: 11, text: "</:1:>".into() }
+                prefix: Chunk { position: 0, text: "<:1:>".into() },
+                postfix: Chunk { position: 11, text: "</:1:>".into() }
             },
             Wrapper {
-                before: Chunk { position: 10, text: "<:2:>".into() },
-                after: Chunk { position: 11, text: "</:2:>".into() }
+                prefix: Chunk { position: 10, text: "<:2:>".into() },
+                postfix: Chunk { position: 11, text: "</:2:>".into() }
             },
         ];
 

@@ -1,4 +1,5 @@
 use std::collections::LinkedList;
+use std::iter::FromIterator;
 
 
 pub struct Stack<T>(LinkedList<T>);
@@ -23,6 +24,17 @@ impl<T> Stack<T> {
 }
 
 
+impl<T> FromIterator<T> for Stack<T> {
+    fn from_iter<I: IntoIterator<Item=T>>(iterable: I) -> Stack<T> {
+        let mut stack = Stack::new();
+        for item in iterable.into_iter() {
+            stack.push(item);
+        }
+        stack
+    }
+}
+
+
 pub struct Queue<T>(LinkedList<T>);
 
 
@@ -41,5 +53,16 @@ impl<T> Queue<T> {
 
     pub fn peek(&self) -> Option<&T> {
         self.0.front()
+    }
+}
+
+
+impl<T> FromIterator<T> for Queue<T> {
+    fn from_iter<I: IntoIterator<Item=T>>(iterable: I) -> Queue<T> {
+        let mut queue = Queue::new();
+        for item in iterable.into_iter() {
+            queue.enqueue(item);
+        }
+        queue
     }
 }
