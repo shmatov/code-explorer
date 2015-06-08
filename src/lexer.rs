@@ -22,7 +22,7 @@ pub fn read_tokens(filemap: Rc<FileMap>) -> Vec<Token> {
 }
 
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, RustcEncodable)]
 pub struct Interval {
     pub lower_bound: usize, // inclusive
     pub upper_bound: usize, // inclusive
