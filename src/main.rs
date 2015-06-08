@@ -1,4 +1,5 @@
 #![feature(rustc_private)]
+#![feature(path_ext)]
 
 
 extern crate getopts;
@@ -18,7 +19,10 @@ mod lexer;
 mod render;
 
 
+use std::path::Path;
+
+
 fn main() {
-    compiler_api::main();
+    compiler_api::analyze_crate(&Path::new("/tmp/hello_world"));
     println!("Hello, world!");
 }
