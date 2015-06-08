@@ -1,21 +1,50 @@
 use std::path::{Path, PathBuf};
 
-use rustc::middle::ty::CtxtArenas;
+pub use syntax::ast::Crate;
+pub use syntax::ast_map::{Forest, Map};
+pub use rustc_driver::driver::assign_node_ids_and_map;
+pub use rustc::middle::ty::{CrateAnalysis, CtxtArenas};
+
 use rustc::session::config::{CrateType, Input, build_configuration};
-use rustc::session::{self, Session};
+use rustc::session::Session;
+
 use rustc_driver;
 use rustc_resolve;
-use syntax::{ast, ast_map};
 
 
-pub fn analyze_crate(crate_path: &Path) -> analysis::Analysis {
-    let (source_path, crate_type) =
-        get_main_file_path(crate_path).expect("Can't find main file.");
-    compile(source_path, crate_type)
+pub fn parse_and_expand(sess: &Session, source_path: &Path) -> Option<(String, Crate)> {
+    use rustc_trans::back::link;
+    use rustc_driver::driver::{
+        phase_1_parse_input,
+        phase_2_configure_and_expand
+    };
+
+    let cfg = build_configuration(&sess);
+
+
+    let input = &Input::File(source_path.into());
+    let krate = phase_1_parse_input(sess, cfg, input);
+
+    let id = link::find_crate_name(
+        Some(sess), &krate.attrs, input
+    );
+
+    phase_2_configure_and_expand(
+        sess, krate, &id[..], None
+    ).map(|krate| (id, krate))
 }
 
 
-fn get_main_file_path(crate_path: &Path) -> Option<(PathBuf, CrateType)> {
+pub fn analyze<'ast>(sess: Session, crate_id: String, ast_map: Map<'ast>, arenas: &'ast CtxtArenas<'ast>) -> CrateAnalysis<'ast> {
+    use rustc_driver::driver::phase_3_run_analysis_passes;
+
+    phase_3_run_analysis_passes(
+        sess, ast_map, arenas, crate_id, rustc_resolve::MakeGlobMap::Yes
+    )
+}
+
+
+pub fn get_main_file_path(crate_path: &Path) -> Option<(PathBuf, CrateType)> {
     use std::fs::PathExt;
 
     vec![
@@ -25,15 +54,8 @@ fn get_main_file_path(crate_path: &Path) -> Option<(PathBuf, CrateType)> {
 }
 
 
-fn compile(input_file_path: PathBuf, crate_type: CrateType) -> analysis::Analysis {
-    let sess = build_session(input_file_path.clone(), crate_type);
-    let cfg = build_configuration(&sess);
-
-    compile_input(sess, cfg, input_file_path)
-}
-
-
-fn build_session(input_file_path: PathBuf, crate_type: CrateType) -> Session {
+pub fn build_session(input_file_path: PathBuf, crate_type: CrateType) -> Session {
+    use rustc::session;
     use rustc::session::config::{basic_options, UnstableFeatures};
 
     let descriptions = rustc_driver::diagnostics_registry();
@@ -48,43 +70,26 @@ fn build_session(input_file_path: PathBuf, crate_type: CrateType) -> Session {
     )
 }
 
-
-fn compile_input(sess: Session, cfg: ast::CrateConfig, input_file_path: PathBuf) -> analysis::Analysis {
-    use rustc_trans::back::link;
-    use rustc_driver::driver::{
-        phase_1_parse_input,
-        phase_2_configure_and_expand,
-        assign_node_ids_and_map,
-        phase_3_run_analysis_passes,
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+    use super::{
+        CtxtArenas, Forest, build_session, get_main_file_path, parse_and_expand,
+        assign_node_ids_and_map, analyze
     };
 
+    #[test]
+    fn test() {
+        let crate_path = Path::new("/tmp/hello_world/");
+        let (source_path, crate_type) =
+            get_main_file_path(crate_path).expect("Can't find main file.");
 
-    let input = &Input::File(input_file_path);
-    let krate = phase_1_parse_input(&sess, cfg, input);
+        let sess = build_session(source_path.clone(), crate_type);
+        let (id, expanded_crate) = parse_and_expand(&sess, &source_path).unwrap();
 
-    let id = link::find_crate_name(
-        Some(&sess), &krate.attrs, input
-    );
-    let expanded_crate = phase_2_configure_and_expand(
-        &sess, krate, &id[..], None
-    ).unwrap();
-
-    let mut forest = ast_map::Forest::new(expanded_crate);
-    let arenas = CtxtArenas::new();
-    let ast_map = assign_node_ids_and_map(&sess, &mut forest);
-
-    let analysis = phase_3_run_analysis_passes(
-        sess, ast_map, &arenas, id, rustc_resolve::MakeGlobMap::Yes
-    );
-    println!("Def map: {:?}", analysis.ty_cx.def_map);
-    analysis::Analysis { def_map: analysis.ty_cx.def_map }
-}
-
-
-mod analysis {
-    use rustc::middle::def::DefMap;
-
-    pub struct Analysis {
-        pub def_map: DefMap
+        let mut forest = Forest::new(expanded_crate);
+        let arenas = CtxtArenas::new();
+        let map = assign_node_ids_and_map(&sess, &mut forest);
+        let analysis = analyze(sess, id, map, &arenas);
     }
 }

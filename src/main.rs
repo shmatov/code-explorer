@@ -23,6 +23,5 @@ use std::path::Path;
 
 
 fn main() {
-    compiler_api::analyze_crate(&Path::new("/tmp/hello_world"));
     println!("Hello, world!");
 }
