@@ -1,4 +1,4 @@
 [package]
-name = "code-explorer"
+name = "code_explorer"
 version = "0.1.0"
 authors = ["Roman Shmatov <romanshmatov@gmail.com>"]

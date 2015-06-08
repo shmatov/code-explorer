@@ -1,5 +1,5 @@
 use std::rc::Rc;
-use syntax::codemap::FileMap;
+use syntax::codemap::{self, FileMap};
 use syntax::parse::ParseSess;
 
 use syntax::parse::token::Token as CompilerToken;
@@ -22,11 +22,12 @@ pub fn read_tokens(filemap: Rc<FileMap>) -> Vec<Token> {
 }
 
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Span {
     pub lower_bound: usize, // inclusive
     pub upper_bound: usize, // inclusive
-    filemap: Rc<FileMap>
+    filename: String,
+    snippet: Option<String>
 }
 
 
@@ -43,10 +44,7 @@ pub trait GetSnippet {
 
 
 impl GetSnippet for Span {
-    fn snippet(&self) -> Option<String> {
-        self.filemap.src.clone()
-            .map(|src| src[self.lower_bound .. self.upper_bound + 1].to_string())
-    }
+    fn snippet(&self) -> Option<String> { self.snippet.clone() }
 }
 
 
@@ -55,16 +53,29 @@ impl GetSnippet for Token {
 }
 
 
-fn to_internal_token(token_and_span: TokenAndSpan, filemap: Rc<FileMap>) -> Token {
-    use syntax::codemap::Pos;
-
+pub fn to_internal_token(token_and_span: TokenAndSpan, filemap: Rc<FileMap>) -> Token {
     Token {
         compiler_token: token_and_span.tok,
-        span: Span {
-            lower_bound: token_and_span.sp.lo.to_usize(),
-            upper_bound: token_and_span.sp.hi.to_usize() - 1,
-            filemap: filemap
-        }
+        span: to_internal_span(token_and_span.sp, filemap)
+    }
+}
+
+
+pub fn to_internal_span(span: codemap::Span, filemap: Rc<FileMap>) -> Span {
+    use syntax::codemap::Pos;
+
+    let lower_bound = span.lo.to_usize();
+    let mut upper_bound = span.hi.to_usize();
+    if upper_bound > 0 {
+        upper_bound -= 1;
+    }
+    let snippet = filemap.src.clone().map(|src| src[lower_bound .. upper_bound + 1].to_string());
+
+    Span {
+        lower_bound: lower_bound,
+        upper_bound: upper_bound,
+        filename: filemap.name.clone(),
+        snippet: snippet
     }
 }
 

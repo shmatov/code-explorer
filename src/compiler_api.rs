@@ -21,7 +21,6 @@ pub fn parse_and_expand(sess: &Session, source_path: &Path) -> Option<(String, C
 
     let cfg = build_configuration(&sess);
 
-
     let input = &Input::File(source_path.into());
     let krate = phase_1_parse_input(sess, cfg, input);
 
@@ -50,7 +49,7 @@ pub fn get_main_file_path(crate_path: &Path) -> Option<(PathBuf, CrateType)> {
     vec![
         (crate_path.join("src/main.rs"), CrateType::CrateTypeExecutable),
         (crate_path.join("src/lib.rs"), CrateType::CrateTypeDylib)
-    ].into_iter().inspect(|x| println!("{:?}", x)).find(|&(ref path, _)| path.is_file())
+    ].into_iter().find(|&(ref path, _)| path.is_file())
 }
 
 
