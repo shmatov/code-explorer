@@ -1,6 +1,7 @@
 use std::iter::FromIterator;
-use lexer::{Token, GetSnippet};
+use lexer::{Token, IntervalToSnippet};
 use custom_collections::{Stack, Queue};
+use syntax::codemap::CodeMap;
 
 
 #[derive(Debug)]
@@ -18,7 +19,7 @@ struct Wrapper {
 
 
 #[allow(dead_code)]
-fn render(tokens: Vec<Token>, mut wrappers: Vec<Wrapper>) -> String {
+fn render(codemap: &CodeMap, tokens: Vec<Token>, mut wrappers: Vec<Wrapper>) -> String {
     wrappers.sort_by(|a, b| {
         // left and longest go first
         (a.prefix.position, b.postfix.position)
@@ -30,15 +31,15 @@ fn render(tokens: Vec<Token>, mut wrappers: Vec<Wrapper>) -> String {
 
     let mut buffer = String::new();
     for token in tokens {
-        while wrappers.peek().map_or(false, |x| x.prefix.position == token.span.lower_bound) {
+        while wrappers.peek().map_or(false, |x| x.prefix.position == token.interval.lower_bound) {
             let wrapper = wrappers.dequeue().expect("wrappers.dequeue()");
             buffer.push_str(&wrapper.prefix.text);
             postfixes.push(wrapper.postfix);
         }
 
-        buffer.push_str(&token.snippet().expect("token.snippet()"));
+        buffer.push_str(&codemap.interval_to_snippet(&token.interval).expect("token.snippet"));
 
-        while postfixes.peek().map_or(false, |x| x.position == token.span.upper_bound) {
+        while postfixes.peek().map_or(false, |x| x.position == token.interval.upper_bound) {
             let postfix = postfixes.pop().expect("postfixes.pop()");
             buffer.push_str(&postfix.text);
         }
@@ -76,7 +77,7 @@ mod tests {
             },
         ];
 
-        let result = render(tokens, wrappers);
+        let result = render(&codemap, tokens, wrappers);
         assert_eq!(result, "<:1:><:0:>fn</:0:> main() <:2:>{}</:2:></:1:>\n")
     }
 }

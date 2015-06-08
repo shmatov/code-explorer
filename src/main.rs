@@ -41,6 +41,6 @@ fn main() {
     let map = assign_node_ids_and_map(&sess, &mut forest);
     let analysis = analyze(sess, id, map, &arenas);
 
-    let table = build_goto_table(analysis);
+    let table = build_goto_table(&analysis);
     println!("{:#?}", table);
 }
