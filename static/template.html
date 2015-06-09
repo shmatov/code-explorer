@@ -1,0 +1,49 @@
+<html>
+    <head>
+        <title>Code Explorer</title>
+        <style type="text/css">
+            .source {
+                background: #fdf6e3;
+                color: #657b83;
+                font-size: 16px;
+                font-family: Consolas, monospace;
+            }
+            .active-region {
+              color: #b58900;
+              cursor: pointer;
+            }
+            .definition.active {
+              background: #eee8d5;
+            }
+        </style>
+
+        <script type="text/javascript">
+            function deactivateAll() {
+                var active = document.getElementsByClassName('active');
+                [].slice.call(active).forEach(function(elem) {
+                    elem.classList.remove('active');
+                });
+            }
+
+            function activateDef(defId) {
+                var def = document.getElementById(defId);
+                def.classList.add('active');
+            }
+
+            function changeState() {
+                deactivateAll();
+                var defId = window.location.hash.substr(1);
+                if (defId.length) {
+                    activateDef(defId);
+                }
+            }
+
+            window.onhashchange = changeState;
+            window.onload = changeState;
+        </script>
+    </head>
+
+    <body>
+        <pre class="source">{{code}}</pre>
+    </body>
+</html>

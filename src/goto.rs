@@ -51,8 +51,8 @@ impl<'a, T> UniqRegionRegistry<'a, T> {
         if let Some(&id) = self.region_to_id.get(&region) {
             return id;
         }
-        self.region_to_id.insert(region, self.id);
         self.id += 1;
+        self.region_to_id.insert(region, self.id);
         self.id
     }
 
@@ -87,7 +87,7 @@ pub struct ActiveRegion {
 }
 
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct Region {
     pub filename: String,
     pub start: usize, //inclusive character position

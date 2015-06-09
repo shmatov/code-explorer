@@ -31,11 +31,12 @@ use std::fs::File;
 use std::io::Read;
 use goto::{collect_mappings, Definition, ActiveRegion};
 use render::{Chunk, Wrapper, render};
-use html::tags::Span;
+use html::tags::{Span, A};
 
 
 fn main() {
     let crate_path = std::env::args().nth(1).unwrap();
+    let template_path = std::env::args().nth(2).unwrap();
 
     let (source_path, crate_type) =
         get_main_file_path(&Path::new(&crate_path)).expect("Can't find main file.");
@@ -62,7 +63,16 @@ fn main() {
     let tokens = lexer::read_tokens(filemap.clone());
 
     let result = render(&codemap, tokens, wrappers);
-    println!("{}", result);
+
+    let full = render_file(&template_path[..], &result[..]);
+    println!("{}", full);
+}
+
+fn render_file(path: &str, data: &str) -> String {
+    let mut f = File::open(path).unwrap();
+    let mut s = String::new();
+    f.read_to_string(&mut s).unwrap();
+    s.replace("{{code}}", data)
 }
 
 
@@ -73,7 +83,10 @@ trait ToWrapper {
 
 impl ToWrapper for Definition {
     fn to_wrapper(&self) -> Wrapper {
-        let tag = Span::new().add_class("definition").add_id(format!("def-{}", self.id));
+        let tag = Span::new()
+            .add_class("definition")
+            .add_id(format!("def-{}", self.id))
+            .set_name(format!("def-{}", self.id));
         Wrapper::new(
             Chunk::new(self.region.start, tag.render_open()),
             Chunk::new(self.region.end, tag.render_close())
@@ -84,7 +97,7 @@ impl ToWrapper for Definition {
 
 impl ToWrapper for ActiveRegion {
     fn to_wrapper(&self) -> Wrapper {
-        let tag = Span::new().add_class("active-region");
+        let tag = A::new().add_class("active-region").set_href(format!("#def-{}", self.definition_id));
         Wrapper::new(
             Chunk::new(self.region.start, tag.render_open()),
             Chunk::new(self.region.end, tag.render_close())

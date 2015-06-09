@@ -7,13 +7,14 @@ use std::iter::IntoIterator;
 pub struct Tag<T> {
     tag_type: T,
     classes: HashSet<String>,
-    ids: HashSet<String>
+    ids: HashSet<String>,
+    name: Option<String>
 }
 
 
 impl<T: TagType> Tag<T> {
     pub fn new(tag_type: T) -> Tag<T> {
-        Tag { tag_type: tag_type, ids: HashSet::new(), classes: HashSet::new() }
+        Tag { tag_type: tag_type, ids: HashSet::new(), classes: HashSet::new(), name: None }
     }
 
     pub fn add_class<S: Into<String>>(mut self, class: S) -> Tag<T> {
@@ -23,6 +24,11 @@ impl<T: TagType> Tag<T> {
 
     pub fn add_id<S: Into<String>>(mut self, id: S) -> Tag<T> {
         self.ids.insert(id.into());
+        self
+    }
+
+    pub fn set_name<S: Into<String>>(mut self, name: S) -> Tag<T> {
+        self.name = Some(name.into());
         self
     }
 
@@ -47,6 +53,9 @@ impl<T: TagType> Tag<T> {
         }
         if self.ids.len() > 0 {
             attributes.push(("id".to_string(), concat_chunks(&self.ids, " ")));
+        }
+        if let Some(ref name) = self.name {
+            attributes.push(("name".to_string(), name.clone()));
         }
         attributes
     }
