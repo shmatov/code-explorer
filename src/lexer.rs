@@ -9,11 +9,12 @@ use syntax::parse::lexer::{Reader, StringReader, TokenAndSpan};
 #[allow(dead_code)]
 pub fn read_tokens(filemap: Rc<FileMap>) -> Vec<Token> {
     let sess = ParseSess::new();
+    filemap.lines.borrow_mut().clear(); // this hack allows tokenize file one more time
     let mut lexer = StringReader::new(&sess.span_diagnostic, filemap.clone());
 
     let mut tokens = Vec::new();
     loop {
-        let token = to_internal_token(lexer.next_token(), filemap.name.clone());
+        let token = to_internal_token(lexer.next_token(), filemap.clone());
         if token.compiler_token == CompilerToken::Eof {
             return tokens;
         }
@@ -30,26 +31,26 @@ pub struct Interval {
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Token {
     pub compiler_token: CompilerToken,
     pub interval: Interval
 }
 
 
-pub fn to_internal_token(token_and_span: TokenAndSpan, filename: String) -> Token {
+pub fn to_internal_token(token_and_span: TokenAndSpan, filemap: Rc<FileMap>) -> Token {
     Token {
         compiler_token: token_and_span.tok,
-        interval: to_interval(token_and_span.sp, filename)
+        interval: to_interval(token_and_span.sp, filemap)
     }
 }
 
 
-pub fn to_interval(span: codemap::Span, filename: String) -> Interval {
+pub fn to_interval(span: codemap::Span, filemap: Rc<FileMap>) -> Interval {
     use syntax::codemap::Pos;
 
-    let lower_bound = span.lo.to_usize();
-    let mut upper_bound = span.hi.to_usize();
+    let lower_bound = span.lo.to_usize() - filemap.start_pos.to_usize();
+    let mut upper_bound = span.hi.to_usize() - filemap.start_pos.to_usize();
     if upper_bound > 0 {
         upper_bound -= 1;
     }
@@ -57,7 +58,7 @@ pub fn to_interval(span: codemap::Span, filename: String) -> Interval {
     Interval {
         lower_bound: lower_bound,
         upper_bound: upper_bound,
-        filename: filename,
+        filename: filemap.name.clone(),
     }
 }
 

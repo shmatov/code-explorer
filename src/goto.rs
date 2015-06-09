@@ -24,8 +24,10 @@ pub fn collect_mappings(crate_analysis: &CrateAnalysis) -> (Vec<ActiveRegion>, V
 
     let mut active_regions = Vec::new();
     for (active_region, def_region) in mappings {
-        let def_id = definitions_generator.get_or_register(def_region);
-        active_regions.push(ActiveRegion { definition_id: def_id, region: active_region});
+        let def_id = definitions_generator.get_or_register(def_region.clone());
+        active_regions.push(
+            ActiveRegion { def: (def_region.filename, def_id), region: active_region}
+        );
     }
     (active_regions, definitions_generator.generate())
 }
@@ -82,7 +84,7 @@ pub struct Definition {
 
 
 pub struct ActiveRegion {
-    pub definition_id: u32,
+    pub def: (String, u32),
     pub region: Region
 }
 

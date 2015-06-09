@@ -47,8 +47,8 @@ pub fn get_main_file_path(crate_path: &Path) -> Option<(PathBuf, CrateType)> {
     use std::fs::PathExt;
 
     vec![
-        (crate_path.join("src/main.rs"), CrateType::CrateTypeExecutable),
-        (crate_path.join("src/lib.rs"), CrateType::CrateTypeDylib)
+        (crate_path.join("main.rs"), CrateType::CrateTypeExecutable),
+        (crate_path.join("lib.rs"), CrateType::CrateTypeDylib)
     ].into_iter().find(|&(ref path, _)| path.is_file())
 }
 

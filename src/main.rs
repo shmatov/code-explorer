@@ -32,6 +32,7 @@ use std::io::Read;
 use goto::{collect_mappings, Definition, ActiveRegion};
 use render::{Chunk, Wrapper, render};
 use html::tags::{Span, A};
+use std::collections::HashMap;
 
 
 fn main() {
@@ -50,22 +51,38 @@ fn main() {
     let analysis = analyze(sess, id, map, &arenas);
 
     let (active_regions, definitions) = collect_mappings(&analysis);
-    let def_wrappers = definitions.into_iter().map(|x| x.to_wrapper());
-    let active_wrappers = active_regions.into_iter().map(|x| x.to_wrapper());
 
-    let wrappers: Vec<_> = def_wrappers.chain(active_wrappers).collect();
+    let def_wrappers = definitions.into_iter().map(|x| (x.region.filename.clone(), x.to_wrapper()));
+    let active_wrappers = active_regions.into_iter().map(|x| (x.region.filename.clone(), x.to_wrapper()));
 
-    let codemap = CodeMap::new();
-    let mut f = File::open(source_path).unwrap();
-    let mut s = String::new();
-    f.read_to_string(&mut s).unwrap();
-    let filemap = codemap.new_filemap("".into(), s);
-    let tokens = lexer::read_tokens(filemap.clone());
+    let mut wrappers_by_filename = HashMap::new();
+    for (filename, wrapper) in def_wrappers.chain(active_wrappers) {
+        let mut wrappers = wrappers_by_filename.entry(filename).or_insert_with(|| Vec::new());
+        wrappers.push(wrapper);
+    }
 
-    let result = render(&codemap, tokens, wrappers);
+    let output = PathBuf::from("result/");
 
-    let full = render_file(&template_path[..], &result[..]);
-    println!("{}", full);
+    let codemap = analysis.ty_cx.sess.codemap();
+    for filemap in filemaps(codemap) {
+        let tokens = lexer::read_tokens(filemap.clone());
+        let result = render(&filemap, tokens, wrappers_by_filename.remove(&filemap.name).unwrap_or_else(|| Vec::new()));
+        let full = render_file(&template_path[..], &result[..]);
+        println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>> FILE: {}", &filemap.name);
+        let mut result_path = output.join(
+            &path_relative_from(&PathBuf::from(&filemap.name), &PathBuf::from(&crate_path)).unwrap()
+        );
+        result_path.set_extension("html");
+        write_file(&result_path, full)
+    }
+}
+
+
+fn write_file(path: &Path, data: String) {
+    use std::io::Write;
+    println!("write {:?}", path);
+    let mut f = File::create(path).ok().expect("create fil");
+    f.write_all(data.as_bytes()).ok().expect("write file");
 }
 
 fn render_file(path: &str, data: &str) -> String {
@@ -73,6 +90,20 @@ fn render_file(path: &str, data: &str) -> String {
     let mut s = String::new();
     f.read_to_string(&mut s).unwrap();
     s.replace("{{code}}", data)
+}
+
+
+use std::rc::Rc;
+use syntax::codemap::{FileMap};
+
+fn filemaps(codemap: &CodeMap) -> Vec<Rc<FileMap>> {
+    let mut filemaps = Vec::new();
+    for fm in &*codemap.files.borrow() {
+        if fm.is_real_file() {
+            filemaps.push(fm.clone());
+        }
+    }
+    filemaps
 }
 
 
@@ -95,12 +126,57 @@ impl ToWrapper for Definition {
 }
 
 
+use std::path::PathBuf;
 impl ToWrapper for ActiveRegion {
     fn to_wrapper(&self) -> Wrapper {
-        let tag = A::new().add_class("active-region").set_href(format!("#def-{}", self.definition_id));
+        let from_path = PathBuf::from(self.region.filename.clone());
+        let def_path = PathBuf::from(self.def.0.clone());
+        let mut path_to_def = path_relative_from(&def_path, &from_path).unwrap();
+        path_to_def.set_extension("html");
+        let tag = A::new().add_class("active-region").set_href(format!("{}#def-{}", path_to_def.to_str().unwrap(), self.def.1));
         Wrapper::new(
             Chunk::new(self.region.start, tag.render_open()),
             Chunk::new(self.region.end, tag.render_close())
         )
+    }
+}
+
+fn path_relative_from(path: &Path, base: &Path) -> Option<PathBuf> {
+    use std::path::Component;
+
+    if path.is_absolute() != base.is_absolute() {
+        if path.is_absolute() {
+            Some(PathBuf::from(path))
+        } else {
+            None
+        }
+    } else {
+        let mut ita = path.components();
+        let mut itb = base.components();
+        let mut comps: Vec<Component> = vec![];
+        loop {
+            match (ita.next(), itb.next()) {
+                (None, None) => break,
+                (Some(a), None) => {
+                    comps.push(a);
+                    comps.extend(ita.by_ref());
+                    break;
+                }
+                (None, _) => comps.push(Component::ParentDir),
+                (Some(a), Some(b)) if comps.is_empty() && a == b => (),
+                (Some(a), Some(b)) if b == Component::CurDir => comps.push(a),
+                (Some(_), Some(b)) if b == Component::ParentDir => return None,
+                (Some(a), Some(_)) => {
+                    comps.push(Component::ParentDir);
+                    for _ in itb {
+                        comps.push(Component::ParentDir);
+                    }
+                    comps.push(a);
+                    comps.extend(ita.by_ref());
+                    break;
+                }
+            }
+        }
+        Some(comps.iter().map(|c| c.as_os_str()).collect())
     }
 }

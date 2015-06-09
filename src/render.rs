@@ -1,7 +1,7 @@
 use std::iter::FromIterator;
 use lexer::{Token, IntervalToSnippet};
 use custom_collections::{Stack, Queue};
-use syntax::codemap::CodeMap;
+use syntax::codemap::FileMap;
 
 
 #[derive(Debug)]
@@ -32,7 +32,7 @@ impl Wrapper {
 
 
 #[allow(dead_code)]
-pub fn render(codemap: &CodeMap, tokens: Vec<Token>, mut wrappers: Vec<Wrapper>) -> String {
+pub fn render(filemap: &FileMap, tokens: Vec<Token>, mut wrappers: Vec<Wrapper>) -> String {
     wrappers.sort_by(|a, b| {
         // left and longest go first
         (a.prefix.position, b.postfix.position)
@@ -50,7 +50,7 @@ pub fn render(codemap: &CodeMap, tokens: Vec<Token>, mut wrappers: Vec<Wrapper>)
             postfixes.push(wrapper.postfix);
         }
 
-        buffer.push_str(&codemap.interval_to_snippet(&token.interval).expect("token.snippet"));
+        buffer.push_str(&filemap.interval_to_snippet(&token.interval).expect("token.snippet"));
 
         while postfixes.peek().map_or(false, |x| x.position == token.interval.upper_bound) {
             let postfix = postfixes.pop().expect("postfixes.pop()");
