@@ -22,7 +22,7 @@ pub fn read_tokens(filemap: Rc<FileMap>) -> Vec<Token> {
 }
 
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, RustcEncodable)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Interval {
     pub lower_bound: usize, // inclusive
     pub upper_bound: usize, // inclusive
@@ -66,10 +66,14 @@ pub trait IntervalToSnippet {
     fn interval_to_snippet(&self, &Interval) -> Option<String>;
 }
 
+
 impl IntervalToSnippet for FileMap {
     fn interval_to_snippet(&self, interval: &Interval) -> Option<String> {
         match (self.src.clone(), self.name == interval.filename) {
-            (Some(src), true) => Some(src[interval.lower_bound .. interval.upper_bound + 1].to_string()),
+            (Some(src), true) => {
+                let snippet = src[interval.lower_bound .. interval.upper_bound + 1].to_string();
+                Some(escape_shippet(snippet))
+            },
             _ => None
         }
     }
@@ -81,6 +85,15 @@ impl IntervalToSnippet for CodeMap {
         self.files.borrow().iter()
             .find(|filemap| filemap.name == interval.filename)
             .and_then(|filemap| filemap.interval_to_snippet(interval))
+    }
+}
+
+
+fn escape_shippet(snippet: String) -> String {
+    match &snippet[..] {
+        "<" => "&lt;".to_string(),
+        ">" => "&gt;".to_string(),
+        _ => snippet
     }
 }
 

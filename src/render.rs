@@ -5,21 +5,34 @@ use syntax::codemap::CodeMap;
 
 
 #[derive(Debug)]
-struct Chunk {
-    position: usize,
-    text: String
+pub struct Chunk {
+    pub position: usize,
+    pub text: String
+}
+
+impl Chunk {
+    pub fn new(position: usize, text: String) -> Chunk {
+        Chunk { position: position, text: text}
+    }
 }
 
 
 #[derive(Debug)]
-struct Wrapper {
-    prefix: Chunk,
-    postfix: Chunk
+pub struct Wrapper {
+    pub prefix: Chunk,
+    pub postfix: Chunk
+}
+
+
+impl Wrapper {
+    pub fn new(prefix: Chunk, postfix: Chunk) -> Wrapper {
+        Wrapper { prefix: prefix, postfix: postfix}
+    }
 }
 
 
 #[allow(dead_code)]
-fn render(codemap: &CodeMap, tokens: Vec<Token>, mut wrappers: Vec<Wrapper>) -> String {
+pub fn render(codemap: &CodeMap, tokens: Vec<Token>, mut wrappers: Vec<Wrapper>) -> String {
     wrappers.sort_by(|a, b| {
         // left and longest go first
         (a.prefix.position, b.postfix.position)
