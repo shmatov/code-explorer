@@ -21,6 +21,10 @@ impl<T> Stack<T> {
     pub fn peek(&self) -> Option<&T> {
         self.0.back()
     }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 
@@ -35,7 +39,7 @@ impl<T> FromIterator<T> for Stack<T> {
 }
 
 
-pub struct Queue<T>(LinkedList<T>);
+pub struct Queue<T>(pub LinkedList<T>);
 
 
 impl<T> Queue<T> {
@@ -53,6 +57,10 @@ impl<T> Queue<T> {
 
     pub fn peek(&self) -> Option<&T> {
         self.0.front()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 }
 

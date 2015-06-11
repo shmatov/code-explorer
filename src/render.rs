@@ -39,6 +39,10 @@ pub fn render(filemap: &FileMap, tokens: Vec<Token>, mut wrappers: Vec<Wrapper>)
             .cmp(&(b.prefix.position, a.postfix.position))
     });
 
+    println!("total wrappers: {}", wrappers.len());
+
+    //let mut intervals = Vec::new();
+
     let mut wrappers = Queue::from_iter(wrappers);
     let mut postfixes = Stack::new();
 
@@ -52,11 +56,22 @@ pub fn render(filemap: &FileMap, tokens: Vec<Token>, mut wrappers: Vec<Wrapper>)
 
         buffer.push_str(&filemap.interval_to_snippet(&token.interval).expect("token.snippet"));
 
+        //intervals.push((token.interval.lower_bound, token.interval.upper_bound));
+
         while postfixes.peek().map_or(false, |x| x.position == token.interval.upper_bound) {
             let postfix = postfixes.pop().expect("postfixes.pop()");
             buffer.push_str(&postfix.text);
         }
     }
+
+    println!("not applied wrappers: {}", wrappers.len());
+    println!("partialy applied wrappers: {}", postfixes.len());
+    //for wrapper in wrappers.0 {
+        //println!("wrapper. prefix: {}, postfix: {}", wrapper.prefix.position, wrapper.postfix.position);
+    //}
+    //for interval in intervals {
+        //println!("interval. {:?}", interval);
+    //}
     buffer
 }
 

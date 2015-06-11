@@ -65,10 +65,11 @@ fn main() {
 
     let codemap = analysis.ty_cx.sess.codemap();
     for filemap in filemaps(codemap) {
+        println!("\n\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>> FILE: {}", &filemap.name);
         let tokens = lexer::read_tokens(filemap.clone());
-        let result = render(&filemap, tokens, wrappers_by_filename.remove(&filemap.name).unwrap_or_else(|| Vec::new()));
+        let wrappers = wrappers_by_filename.remove(&filemap.name).unwrap_or_else(|| Vec::new());
+        let result = render(&filemap, tokens, wrappers);
         let full = render_file(&template_path[..], &result[..]);
-        println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>> FILE: {}", &filemap.name);
         let mut result_path = output.join(
             &path_relative_from(&PathBuf::from(&filemap.name), &PathBuf::from(&crate_path)).unwrap()
         );
@@ -86,10 +87,15 @@ fn write_file(path: &Path, data: String) {
 }
 
 fn render_file(path: &str, data: &str) -> String {
+    let mut lines_buf = String::new();
+    for line in (1..data.lines().count() + 1) {
+        lines_buf.push_str(&format!("<li>{}</li>", line));
+    }
+
     let mut f = File::open(path).unwrap();
     let mut s = String::new();
     f.read_to_string(&mut s).unwrap();
-    s.replace("{{code}}", data)
+    s.replace("{{code}}", data).replace("{{lines}}", &lines_buf)
 }
 
 
@@ -127,6 +133,7 @@ impl ToWrapper for Definition {
 
 
 use std::path::PathBuf;
+
 impl ToWrapper for ActiveRegion {
     fn to_wrapper(&self) -> Wrapper {
         let from_path = PathBuf::from(self.region.filename.clone());
