@@ -32,7 +32,7 @@ impl Wrapper {
 
 
 #[allow(dead_code)]
-pub fn render(filemap: &FileMap, tokens: Vec<Token>, mut wrappers: Vec<Wrapper>) -> String {
+pub fn apply_wrappers(filemap: &FileMap, tokens: Vec<Token>, mut wrappers: Vec<Wrapper>) -> String {
     wrappers.sort_by(|a, b| {
         // left and longest go first
         (a.prefix.position, b.postfix.position)

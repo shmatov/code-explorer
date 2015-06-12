@@ -22,6 +22,7 @@ mod render;
 
 
 use std::path::Path;
+use std::path::PathBuf;
 use compiler_api::{
     CtxtArenas, Forest, build_session, get_main_file_path, parse_and_expand,
     assign_node_ids_and_map, analyze
@@ -30,42 +31,92 @@ use syntax::codemap::CodeMap;
 use std::fs::File;
 use std::io::Read;
 use goto::{collect_mappings, Definition, ActiveRegion};
-use render::{Chunk, Wrapper, render};
+use render::{Chunk, Wrapper, apply_wrappers};
 use html::tags::{Span, A};
 use std::collections::HashMap;
-use getopts::{Options, Matches};
+use path_extensions::PathExtensions;
+use std::rc::Rc;
+use syntax::codemap::{FileMap};
+use std::hash::Hash;
 
 
-fn create_options_parser() -> Options {
-    let mut opts = Options::new();
-    opts.reqopt("i", "in", "", "DIR");
-    opts.reqopt("o", "out", "", "DIR");
-    opts.reqopt("t", "template", "", "FILE");
-    opts.optflag("h", "help", "print this help menu");
-    opts
-}
+mod options {
+    use getopts::{Options};
+    use std::path::PathBuf;
+    use std::env::Args;
+    use self::errors::Error;
 
 
-fn parse_options() -> Matches {
-    use std::env;
+    pub fn parse(args: Args) -> OptionsResult<Opts> {
+        let parser = create_options_parser();
+        let opts = try!(parser.parse(args.skip(1)));
 
-    let parser = create_options_parser();
-    match parser.parse(env::args().skip(1)) {
-        Ok(matches) => matches,
-        Err(err) => panic!(err.to_string())
+        Ok(Opts {
+            input: PathBuf::from(opts.opt_str("i").unwrap()),
+            output: PathBuf::from(opts.opt_str("o").unwrap()),
+            template: PathBuf::from(opts.opt_str("t").unwrap())
+        })
+    }
+
+
+    pub type OptionsResult<T> = Result<T, Error>;
+
+
+    pub struct Opts {
+        pub input: PathBuf,
+        pub output: PathBuf,
+        pub template: PathBuf
+    }
+
+
+    fn create_options_parser() -> Options {
+        let mut opts = Options::new();
+        opts.reqopt("i", "in", "", "DIR");
+        opts.reqopt("o", "out", "", "DIR");
+        opts.reqopt("t", "template", "", "FILE");
+        opts.optflag("h", "help", "print this help menu");
+        opts
+    }
+
+
+    pub mod errors {
+        use getopts::{Fail};
+        use std::fmt;
+
+
+        pub struct Error(String);
+
+
+        impl From<Fail> for Error {
+            fn from(err: Fail) -> Error {
+                Error(err.to_string())
+            }
+        }
+
+
+        impl<'a> From<&'a str> for Error {
+            fn from(err: &str) -> Error {
+                Error(err.to_string())
+            }
+        }
+
+        impl fmt::Display for Error {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
     }
 }
 
 
 fn main() {
-    let options = parse_options();
-    let crate_path = options.opt_str("i").unwrap();
-    let result_path = options.opt_str("o").unwrap();
-    let template_path = options.opt_str("t").unwrap();
-
+    let options = match options::parse(std::env::args()) {
+        Ok(options) => options,
+        Err(err) => { println!("{}", err); return; }
+    };
 
     let (source_path, crate_type) =
-        get_main_file_path(&Path::new(&crate_path)).expect("Can't find main file.");
+        get_main_file_path(&options.input).expect("Can't find main file.");
 
     let sess = build_session(source_path.clone(), crate_type);
     let (id, expanded_crate) = parse_and_expand(&sess, &source_path).unwrap();
@@ -86,46 +137,61 @@ fn main() {
         wrappers.push(wrapper);
     }
 
-    let output = PathBuf::from(result_path);
-
     let codemap = analysis.ty_cx.sess.codemap();
     for filemap in filemaps(codemap) {
         println!("\n\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>> FILE: {}", &filemap.name);
         let tokens = lexer::read_tokens(filemap.clone());
         let wrappers = wrappers_by_filename.remove(&filemap.name).unwrap_or_else(|| Vec::new());
-        let result = render(&filemap, tokens, wrappers);
-        let full = render_file(&template_path[..], &result[..]);
-        let mut result_path = output.join(
-            &path_relative_from(&PathBuf::from(&filemap.name), &PathBuf::from(&crate_path)).unwrap()
+        let result = apply_wrappers(&filemap, tokens, wrappers);
+        let full = render_code(&options.template, result);
+        let mut result_path = options.output.join(
+            &PathBuf::from(&filemap.name).relative_to(&options.input).unwrap()
         );
         result_path.set_extension("html");
-        write_file(&result_path, full)
+        write_file(&result_path, &full)
     }
 }
 
 
-fn write_file(path: &Path, data: String) {
-    use std::io::Write;
-    println!("write {:?}", path);
-    let mut f = File::create(path).ok().expect("create fil");
-    f.write_all(data.as_bytes()).ok().expect("write file");
-}
-
-fn render_file(path: &str, data: &str) -> String {
+fn render_code<T: AsRef<str>>(template_path: &Path, data: T) -> String {
     let mut lines_buf = String::new();
-    for line in (1..data.lines().count() + 1) {
+    for line in (1..data.as_ref().lines().count() + 1) {
         lines_buf.push_str(&format!("<li>{}</li>", line));
     }
 
-    let mut f = File::open(path).unwrap();
-    let mut s = String::new();
-    f.read_to_string(&mut s).unwrap();
-    s.replace("{{code}}", data).replace("{{lines}}", &lines_buf)
+    let mut variables = HashMap::new();
+    variables.insert("{{code}}", data.as_ref());
+    variables.insert("{{lines}}", &lines_buf[..]);
+
+    render_template(template_path, &variables)
 }
 
 
-use std::rc::Rc;
-use syntax::codemap::{FileMap};
+fn render_template<K, V>(template_path: &Path, variables: &HashMap<K, V>) -> String where K: AsRef<str> + Hash + Eq, V: AsRef<str> {
+    variables.iter().fold(
+        read_file(template_path),
+        |template, (key, value)| template.replace(key.as_ref(), value.as_ref())
+    )
+}
+
+
+fn read_file(path: &Path) -> String {
+    use std::fs::File;
+
+    let mut file = File::open(path).unwrap();
+    let mut buf = String::new();
+    file.read_to_string(&mut buf).unwrap();
+    buf
+}
+
+
+fn write_file<T: AsRef<str>>(path: &Path, data: &T) {
+    use std::io::Write;
+    println!("write {:?}", path);
+    let mut f = File::create(path).ok().expect("create fil");
+    f.write_all(data.as_ref().as_bytes()).ok().expect("write file");
+}
+
 
 fn filemaps(codemap: &CodeMap) -> Vec<Rc<FileMap>> {
     let mut filemaps = Vec::new();
@@ -157,13 +223,12 @@ impl ToWrapper for Definition {
 }
 
 
-use std::path::PathBuf;
 
 impl ToWrapper for ActiveRegion {
     fn to_wrapper(&self) -> Wrapper {
         let from_path = PathBuf::from(self.region.filename.clone());
         let def_path = PathBuf::from(self.def.0.clone());
-        let mut path_to_def = path_relative_from(&def_path, &from_path).unwrap();
+        let mut path_to_def = def_path.relative_to(&from_path).unwrap();
         path_to_def.set_extension("html");
         let tag = A::new().add_class("active-region").set_href(format!("{}#def-{}", path_to_def.to_str().unwrap(), self.def.1));
         Wrapper::new(
@@ -173,42 +238,55 @@ impl ToWrapper for ActiveRegion {
     }
 }
 
-fn path_relative_from(path: &Path, base: &Path) -> Option<PathBuf> {
-    use std::path::Component;
 
-    if path.is_absolute() != base.is_absolute() {
-        if path.is_absolute() {
-            Some(PathBuf::from(path))
-        } else {
-            None
-        }
-    } else {
-        let mut ita = path.components();
-        let mut itb = base.components();
-        let mut comps: Vec<Component> = vec![];
-        loop {
-            match (ita.next(), itb.next()) {
-                (None, None) => break,
-                (Some(a), None) => {
-                    comps.push(a);
-                    comps.extend(ita.by_ref());
-                    break;
+mod path_extensions {
+    use std::path::{Path, PathBuf, Component};
+
+
+    pub trait PathExtensions {
+        fn relative_to<P: ?Sized + AsRef<Path>>(&self, &P) -> Option<PathBuf>;
+    }
+
+
+    impl PathExtensions for Path {
+        fn relative_to<P: ?Sized + AsRef<Path>>(&self, base: &P) -> Option<PathBuf> {
+            let base = base.as_ref();
+
+            if self.is_absolute() != base.is_absolute() {
+                if self.is_absolute() {
+                    Some(PathBuf::from(self))
+                } else {
+                    None
                 }
-                (None, _) => comps.push(Component::ParentDir),
-                (Some(a), Some(b)) if comps.is_empty() && a == b => (),
-                (Some(a), Some(b)) if b == Component::CurDir => comps.push(a),
-                (Some(_), Some(b)) if b == Component::ParentDir => return None,
-                (Some(a), Some(_)) => {
-                    comps.push(Component::ParentDir);
-                    for _ in itb {
-                        comps.push(Component::ParentDir);
+            } else {
+                let mut ita = self.components();
+                let mut itb = base.components();
+                let mut comps: Vec<Component> = vec![];
+                loop {
+                    match (ita.next(), itb.next()) {
+                        (None, None) => break,
+                        (Some(a), None) => {
+                            comps.push(a);
+                            comps.extend(ita.by_ref());
+                            break;
+                        }
+                        (None, _) => comps.push(Component::ParentDir),
+                        (Some(a), Some(b)) if comps.is_empty() && a == b => (),
+                        (Some(a), Some(b)) if b == Component::CurDir => comps.push(a),
+                        (Some(_), Some(b)) if b == Component::ParentDir => return None,
+                        (Some(a), Some(_)) => {
+                            comps.push(Component::ParentDir);
+                            for _ in itb {
+                                comps.push(Component::ParentDir);
+                            }
+                            comps.push(a);
+                            comps.extend(ita.by_ref());
+                            break;
+                        }
                     }
-                    comps.push(a);
-                    comps.extend(ita.by_ref());
-                    break;
                 }
+                Some(comps.iter().map(|c| c.as_os_str()).collect())
             }
         }
-        Some(comps.iter().map(|c| c.as_os_str()).collect())
     }
 }
