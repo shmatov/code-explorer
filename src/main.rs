@@ -33,11 +33,36 @@ use goto::{collect_mappings, Definition, ActiveRegion};
 use render::{Chunk, Wrapper, render};
 use html::tags::{Span, A};
 use std::collections::HashMap;
+use getopts::{Options, Matches};
+
+
+fn create_options_parser() -> Options {
+    let mut opts = Options::new();
+    opts.reqopt("i", "in", "", "DIR");
+    opts.reqopt("o", "out", "", "DIR");
+    opts.reqopt("t", "template", "", "FILE");
+    opts.optflag("h", "help", "print this help menu");
+    opts
+}
+
+
+fn parse_options() -> Matches {
+    use std::env;
+
+    let parser = create_options_parser();
+    match parser.parse(env::args().skip(1)) {
+        Ok(matches) => matches,
+        Err(err) => panic!(err.to_string())
+    }
+}
 
 
 fn main() {
-    let crate_path = std::env::args().nth(1).unwrap();
-    let template_path = std::env::args().nth(2).unwrap();
+    let options = parse_options();
+    let crate_path = options.opt_str("i").unwrap();
+    let result_path = options.opt_str("o").unwrap();
+    let template_path = options.opt_str("t").unwrap();
+
 
     let (source_path, crate_type) =
         get_main_file_path(&Path::new(&crate_path)).expect("Can't find main file.");
@@ -61,7 +86,7 @@ fn main() {
         wrappers.push(wrapper);
     }
 
-    let output = PathBuf::from("result/");
+    let output = PathBuf::from(result_path);
 
     let codemap = analysis.ty_cx.sess.codemap();
     for filemap in filemaps(codemap) {
