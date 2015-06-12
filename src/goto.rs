@@ -8,20 +8,21 @@ pub fn collect_mappings(crate_analysis: &CrateAnalysis) -> (Vec<ActiveRegion>, V
     let codemap = ty_cx.sess.codemap();
     let def_map = ty_cx.def_map.borrow();
 
-    let mut definitions_generator = UniqRegionRegistry::new(
-        |region, id| Definition { region: region, id: id}
-    );
-
-    let mappings = def_map.iter()
+    let def_map_mappings = def_map.iter()
         .map(|(&node_id, path)| (
             conversions::node_id_to_span(&ty_cx.map, node_id)
                 .and_then(|span| conversions::span_to_region(codemap, span)),
             conversions::path_resolution_to_span(&ty_cx.map, path)
                 .and_then(|span| conversions::span_to_region(codemap, span))
-        ))
+        ));
+
+    let mappings = def_map_mappings
         .filter_map(has_both)
         .filter(|&(ref a, ref b)| a != b);
 
+    let mut definitions_generator = UniqRegionRegistry::new(
+        |region, id| Definition { region: region, id: id}
+    );
     let mut active_regions = Vec::new();
     for (active_region, def_region) in mappings {
         let def_id = definitions_generator.get_or_register(def_region.clone());

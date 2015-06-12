@@ -4,12 +4,9 @@
 
 extern crate getopts;
 extern crate rustc;
-extern crate rustc_borrowck;
 extern crate rustc_driver;
-extern crate rustc_privacy;
 extern crate rustc_resolve;
 extern crate rustc_trans;
-extern crate rustc_typeck;
 extern crate syntax;
 
 
@@ -154,14 +151,18 @@ fn main() {
 
 
 fn render_code<T: AsRef<str>>(template_path: &Path, data: T) -> String {
-    let mut lines_buf = String::new();
-    for line in (1..data.as_ref().lines().count() + 1) {
-        lines_buf.push_str(&format!("<li>{}</li>", line));
+    fn render_lines(lines_count: usize) -> String {
+        let mut lines_buf = String::new();
+        for line in (1..lines_count + 1) {
+            lines_buf.push_str(&format!("<li>{}</li>", line));
+        }
+        lines_buf
     }
 
+    let lines = render_lines(data.as_ref().lines().count());
     let mut variables = HashMap::new();
     variables.insert("{{code}}", data.as_ref());
-    variables.insert("{{lines}}", &lines_buf[..]);
+    variables.insert("{{lines}}", &lines[..]);
 
     render_template(template_path, &variables)
 }
