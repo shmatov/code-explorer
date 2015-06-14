@@ -12,7 +12,7 @@ extern crate syntax;
 
 mod compiler_api;
 mod custom_collections;
-mod goto;
+mod navigation;
 mod html;
 mod lexer;
 mod render;
@@ -27,7 +27,7 @@ use compiler_api::{
 use syntax::codemap::CodeMap;
 use std::fs::File;
 use std::io::Read;
-use goto::{collect_mappings, Definition, ActiveRegion};
+use navigation::{collect_mappings, Definition, ActiveRegion};
 use render::{Chunk, Wrapper, apply_wrappers};
 use html::tags::{Span, A};
 use std::collections::HashMap;
