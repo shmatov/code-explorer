@@ -237,7 +237,11 @@ impl ToWrapper for ActiveRegion {
         let def_path = PathBuf::from(self.def.0.clone());
         let mut path_to_def = def_path.relative_to(&from_path).unwrap();
         path_to_def.set_extension("html");
-        let tag = A::new().add_class("active-region").set_href(format!("{}#def-{}", path_to_def.to_str().unwrap(), self.def.1));
+        let mut path_as_str = path_to_def.to_str().unwrap();
+        if path_as_str.len() > 0 {
+           path_as_str = &path_as_str[1..path_as_str.len()]
+        }
+        let tag = A::new().add_class("active-region").set_href(format!("{}#def-{}", path_as_str, self.def.1));
         Wrapper::new(
             Chunk::new(self.region.start, tag.render_open()),
             Chunk::new(self.region.end, tag.render_close())
