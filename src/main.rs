@@ -112,18 +112,23 @@ fn main() {
         Err(err) => { println!("{}", err); return; }
     };
 
+    println!("args");
     let (source_path, crate_type) =
         get_main_file_path(&options.input).expect("Can't find main file.");
 
     let sess = build_session(source_path.clone(), crate_type);
     let (id, expanded_crate) = parse_and_expand(&sess, &source_path).unwrap();
 
+    println!("parse");
     let mut forest = Forest::new(expanded_crate);
     let arenas = CtxtArenas::new();
     let map = assign_node_ids_and_map(&sess, &mut forest);
+    println!("assign node ids");
     let analysis = analyze(sess, id, map, &arenas);
+    println!("analyze");
 
     let (active_regions, definitions) = collect_mappings(&analysis);
+    println!("collect");
 
     let def_wrappers = definitions.into_iter().map(|x| (x.region.filename.clone(), x.to_wrapper()));
     let active_wrappers = active_regions.into_iter().map(|x| (x.region.filename.clone(), x.to_wrapper()));
@@ -133,6 +138,7 @@ fn main() {
         let mut wrappers = wrappers_by_filename.entry(filename).or_insert_with(|| Vec::new());
         wrappers.push(wrapper);
     }
+
 
     let codemap = analysis.ty_cx.sess.codemap();
     for filemap in filemaps(codemap) {
@@ -197,7 +203,7 @@ fn write_file<T: AsRef<str>>(path: &Path, data: &T) {
 fn filemaps(codemap: &CodeMap) -> Vec<Rc<FileMap>> {
     let mut filemaps = Vec::new();
     for fm in &*codemap.files.borrow() {
-        if fm.is_real_file() {
+        if fm.is_real_file() && fm.src != None {
             filemaps.push(fm.clone());
         }
     }
